@@ -1,0 +1,244 @@
+## 1. `program` rule
+
+```
+program:
+    WHILE '(' expr REL expr ')'
+    {
+        lhs = $3;
+        rel = $4;
+        rhs = $5;
+        cut = n;
+    }
+    '{' stmts '}'
+    {
+        generate();
+    }
+    ;
+```
+
+This rule checks the overall structure of a `while` loop.
+
+- `WHILE '(' expr REL expr ')'` checks the loop condition, such as `while (i < 10)`.
+- `lhs = $3` stores the left side of the condition, which is `i`.
+- `rel = $4` stores the relational operator, which is `<`.
+- `rhs = $5` stores the right side of the condition, which is `10`.
+- `cut = n` records the point where the loop body begins.
+- `'{' stmts '}'` reads the statements inside the loop.
+- `generate()` produces the TAC, optimized TAC, and target code.
+
+In simple words: This rule checks the while-loop structure, stores its condition, and generates the output after reading the loop body.
+
+## 2. `stmts` rule
+
+```
+stmts:
+      /* empty */
+    | stmts ID '=' expr ';'
+    {
+        emit($2, $4, '=', "");
+    }
+    ;
+```
+
+This rule allows zero or more assignment statements inside the loop.
+
+- `/* empty */` means the loop body can contain no statements.
+- `stmts ID '=' expr ';'` allows another assignment statement.
+- `emit($2, $4, '=', "")` stores the assignment in the TAC array.
+
+Example input:
+
+```
+while (i < 10) {
+    i = i + 1;
+}
+```
+
+The assignment is stored as:
+
+```
+i = __tmp1
+```
+
+The expression `i + 1` generates the temporary instruction separately.
+
+In simple words: This rule reads assignment statements inside the loop and stores them as TAC instructions.
+
+## 3. `expr` rule
+
+```
+expr:
+      expr '+' term { $$ = calc($1, '+', $3); }
+    | expr '-' term { $$ = calc($1, '-', $3); }
+    | term          { $$ = $1; }
+    ;
+```
+
+This rule handles addition and subtraction.
+
+- `expr '+' term` handles addition and calls `calc()`.
+- `expr '-' term` handles subtraction and calls `calc()`.
+- `term { $$ = $1; }` passes the term's value upward when there is no addition or subtraction.
+
+Here, `$1` is the first value, `$3` is the second value, and `$$` stores the result.
+
+Example: For `i + 1`, it generates:
+
+```
+__tmp1 = i + 1
+```
+
+In simple words: This rule identifies addition and subtraction and generates the corresponding TAC.
+
+## 4. `term` rule
+
+```
+term:
+      term '*' atom { $$ = calc($1, '*', $3); }
+    | term '/' atom { $$ = calc($1, '/', $3); }
+    | atom          { $$ = $1; }
+    ;
+```
+
+This rule handles multiplication and division.
+
+- `term '*' atom` handles multiplication.
+- `term '/' atom` handles division.
+- `atom { $$ = $1; }` passes the value upward when no multiplication or division is present.
+
+Example: For `a * 2`, it generates:
+
+```
+__tmp1 = a * 2
+```
+
+In simple words: This rule handles multiplication and division, which have higher precedence than addition and subtraction.
+
+## 5. `atom` rule
+
+```
+atom:
+      ID               { $$ = $1; }
+    | NUM              { $$ = $1; }
+    | '(' expr ')'     { $$ = $2; }
+    ;
+```
+
+This rule recognizes the basic parts of an expression.
+
+- `ID` accepts identifiers such as `i` and `a`.
+- `NUM` accepts numbers such as `10` and `5`.
+- `'(' expr ')'` accepts expressions inside parentheses.
+
+Example: For `(a + 2)`, the value of the inner expression is passed upward.
+
+In simple words: This rule recognizes variables, numbers, and parenthesized expressions.
+
+## 6. Final `%%`
+
+The final `%%` marks the end of the grammar rules. The C functions, such as `yyerror()` and `main()`, are written after it.
+
+### Quick summary for explaining to your staff
+
+- `program`: Checks the overall while-loop structure and calls the output function.
+- `stmts`: Accepts assignments inside the loop.
+- `expr`: Handles addition and subtraction.
+- `term`: Handles multiplication and division.
+- `atom`: Recognizes identifiers, numbers, and parenthesized expressions.
+### 1. Header files and variables
+
+First, we include the required header files for printing output, handling strings, and checking characters. The `yylex()` function gets tokens from Lex, and `yyerror()` displays syntax errors. The variables store temporary values and the loop information.
+
+### 2. TAC structure
+
+The `Ins` structure stores the destination, two operands, and the operator of each instruction. The arrays `q` and `orig` are declared to store instructions, while `n` counts the instructions, `cut` marks the beginning of the loop body, and `tmp` counts temporary variables. In this code, `orig` is declared but not used.
+
+### 3. `isnum()` function
+
+This function checks whether a string contains only digits. It returns true if the string is a number and false otherwise. It is used during constant folding.
+
+### 4. `emit()` function
+
+This function stores a Three Address Code instruction in the array. It also checks whether the instruction limit has been reached.
+
+### 5. `calc()` function
+
+This function creates temporary variables such as `__tmp1` and `__tmp2` for arithmetic operations. It stores the instruction using `emit()` and returns the temporary variable name.
+
+### 6. `show()` function
+
+This function prints a TAC instruction. If it is an assignment, it prints the assignment; otherwise, it prints the arithmetic operation.
+
+### 7. `machine()` function
+
+This function generates target-like instructions using `MOV`, `ADD`, `SUB`, `MUL`, `DIV`, and `STORE`.
+
+### 8. `assigned()` function
+
+This function checks whether a variable is assigned a new value inside the loop body. It helps determine whether an expression can be moved outside the loop.
+
+### 9. `safe()` function
+
+This function checks whether an operand remains unchanged during the loop. It is used to identify loop-invariant expressions.
+
+### 10. `inverse()` function
+
+This function returns the opposite conditional jump instruction for the loop condition. For example, `<` becomes `JGE`, and `==` becomes `JNE`.
+
+### 11. `generate()` function
+
+This is the main output function. It prints the original Three Address Code, performs constant folding, identifies loop-invariant instructions, prints the optimized TAC, and generates target code.
+
+### 12. Constant folding
+
+This part evaluates arithmetic operations when both operands are constants. For example, `__tmp1 = 3 * 4` becomes `__tmp1 = 12`.
+
+### 13. Loop-invariant code motion
+
+This part identifies calculations whose operands do not change inside the loop. Such calculations can be moved outside the loop to avoid repeating them during every iteration.
+
+### 14. Optimized TAC
+
+This section prints loop-invariant instructions before the loop label. The remaining instructions are printed inside the loop, along with the condition and jump back to the beginning.
+
+### 15. Target code generation
+
+This section generates target-like instructions for the optimized program. It places invariant calculations before the loop, checks the loop condition, executes the remaining body instructions, and jumps back to the loop start.
+
+### 16. Union declaration
+
+The `%union` section defines a string pointer to store token values such as identifiers, numbers, and relational operators.
+
+### 17. Token and type declarations
+
+The `%token` declarations define `WHILE`, `ID`, `NUM`, and `REL`. The `%type` declaration specifies that `expr`, `term`, and `atom` carry string values.
+
+### 18. Program rule
+
+The `program` rule checks the structure of a while loop. It reads the condition, stores its left operand, relational operator, and right operand, and records where the loop body begins. After reading the body, it calls `generate()`.
+
+### 19. Statements rule
+
+The `stmts` rule allows an empty loop body or multiple assignment statements inside the loop. Each assignment is stored using the `emit()` function.
+
+### 20. Expression rule
+
+The `expr` rule handles addition and subtraction. It calls `calc()` to generate temporary variables and TAC instructions.
+
+### 21. Term rule
+
+The `term` rule handles multiplication and division. This separation gives multiplication and division higher precedence than addition and subtraction.
+
+### 22. Atom rule
+
+The `atom` rule recognizes identifiers, numbers, and expressions inside parentheses.
+
+### 23. Error-handling function
+
+The `yyerror()` function displays a syntax error message when the input does not follow the grammar.
+
+### 24. Main function
+
+The `main()` function prints the token heading and calls `yyparse()`. The parser obtains tokens from Lex, checks the while-loop syntax, and generates the outputs.
+
+Conclusion: This program checks the syntax of a while loop, generates Three Address Code, performs constant folding and loop-invariant code motion, and produces target-like instructions.
