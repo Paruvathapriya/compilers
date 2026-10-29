@@ -1,0 +1,29 @@
+### Simple Explanation of the YACC Code
+
+1\. `%union` – Defines the data types used to store token values and conditions.
+
+2\. `%token IF` – Declares the `if` keyword token received from LEX.
+
+3\. `%token <s> ID NUM REL` – Declares tokens for identifiers, numbers, and relational operators such as `<` and `>`.
+
+4\. `%type` – Specifies the data types of grammar symbols like expressions and conditions.
+
+5\. `program` – Starts parsing the program and calls `generate()` to display the output.
+
+6\. `statements` – Allows multiple statements in the input program.
+
+7\. `statement` – Recognizes assignment statements and `if` statements.
+
+8\. `ifstmt` – Checks the syntax of an `if` statement, evaluates its condition for translation, and generates a label.
+
+9\. `test` – Recognizes conditions such as `m < 10` and stores the operands and relational operator.
+
+10\. `expr` – Handles addition and subtraction.
+
+11\. `term` – Handles multiplication and division.
+
+12\. `atom` – Recognizes identifiers, numbers, and expressions inside parentheses.
+
+13\. `%%` – Separates the declaration section, grammar rules, and C code sections.
+
+In short: This YACC code checks the syntax of assignment statements and `if` statements, processes arithmetic expressions, and generates intermediate code using semantic actions.
